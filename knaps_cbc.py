@@ -1,5 +1,5 @@
 import mip
-import my.mpsolvers.knaps_base as knaps_base
+import knaps_base
 import numpy as np
 import time
 
@@ -10,10 +10,13 @@ class knapsack_cbc(knaps_base.knapsack_base):
         "integer": mip.INTEGER
         }
     _last_opt_time = None
-    max_time = mip.INF
+    # Maximum duration of optimization process
+    _max_time = mip.INF
     
-    def _create_model(self, name=""):
+    def _create_model(self, name="", max_time = None, **kwargs):
         self._model = mip.Model(solver_name = "CBC")
+        if max_time is not None:
+            self._max_time = max_time
 
 ## Adding a variable: shape = None => single; otherwise (multi)dimensional
 #  If shape is int (incl. 1) or (int,), then create an 1D-vector variable
@@ -105,14 +108,14 @@ class knapsack_cbc(knaps_base.knapsack_base):
         elif sense == ">=" or sense == ">":
             return self._model.add_constr(
                     mip.xsum(
-                        coeff_col[i,0] * self._vars_x[i][j] 
+                        coeff_col[i] * self._vars_x[i][j] 
                             for i in range(self._m) )
                     >= rhs
                 )
         elif sense == "=" or sense == "==":
             return self._model.add_constr(
                     mip.xsum(
-                        coeff_col[i,0] * self._vars_x[i][j] 
+                        coeff_col[i] * self._vars_x[i][j] 
                             for i in range(self._m) )
                     >= rhs
                 )
@@ -134,6 +137,13 @@ class knapsack_cbc(knaps_base.knapsack_base):
                 mip.xsum( wi*vi for vi, wi in zip(var_l,w_l) ) 
                     == rhs
                 )
+
+## Set upper bound for a given model's variable. None -> ub=inf
+    def _set_ub(self, v, ub = None):
+        if ub is None:
+            ub = mip.INF
+        v.ub = ub
+
 
 ## Returns last solution (binary bars): np. matrix or list of np. vectors
     def _sol_x(self):
@@ -172,5 +182,5 @@ class knapsack_cbc(knaps_base.knapsack_base):
 ## Calls optimizer
     def _optimize(self):
         t = time.time()
-        self._model.optimize( max_seconds = self.max_time )
+        self._model.optimize( max_seconds = self._max_time )
         self._last_opt_time = time.time() - t
